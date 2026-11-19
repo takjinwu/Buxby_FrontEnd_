@@ -17,8 +17,8 @@
 | 1 | Expo 뼈대, 라우팅, `lib/`·`api/`·`store/`·`data/` 이식, 디자인 토큰 | 완료 |
 | 2 | 공통 컴포넌트 (`controls`, `display`, `layout`, `MinutesSheet`, `BrandLogos`) | 완료 (`/gallery`에서 확인) |
 | 3 | 화면 이식 (`src/app/**` 의 Placeholder를 실제 화면으로) | 완료 (기기 실행 확인 전) |
-| 4 | 카카오 지도 (`KakaoMap.jsx`, `lib/kakao.js`) — WebView + JS SDK 우선 | |
-| 5 | 간편 로그인 (시스템 브라우저 + `buxby://` 딥링크, 토큰 저장) — 백엔드 수정 필요 | |
+| 4 | 카카오 지도 (`KakaoMap.jsx`, `lib/kakao.js`) — WebView + JS SDK 우선 | 완료 (기기 실행 확인 전) |
+| 5 | 간편 로그인 (시스템 브라우저 + `buxby://` 딥링크) — 백엔드 `feat/app-social-login` 브랜치 필요 | 완료 (백엔드 배포 전) |
 | 6 | 알람 (`AlarmWatcher.jsx` → 로컬 알림 예약, 출발 알림은 서버 푸시) | |
 
 ## 폴더 구조
@@ -103,7 +103,7 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
 - `api/client.js`: 상대경로 `/api/...` 앞에 `API_URL` 을 붙인다. `URLSearchParams` 대신 직접 쿼리 문자열을 만들고, 값이 `undefined`/`null` 인 항목은 보내지 않는다 (원본은 `"undefined"` 문자열로 보냈음)
 - `api/auth.js`: `socialLogin()` 은 5단계 전까지 "준비 중" 에러를 던진다
 - `store/AppStateProvider.jsx`: 저장소를 다 읽기 전(`hydrated=false`)에는 아무것도 그리지 않고 스플래시를 유지한다. 읽기 전에는 저장하지 않는다
-- 아직 옮기지 않음: `lib/kakao.js` 실제 구현(4단계, 지금은 빈 껍데기), `components/AlarmWatcher.jsx`(6단계), 간편 로그인 리다이렉트 처리(5단계)
+- 아직 옮기지 않음: `components/AlarmWatcher.jsx`(6단계)
 
 ## 2단계에서 원본과 달라진 점
 
@@ -115,16 +115,39 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
 
 - 화면 전용 부품은 `src/app` 에 둘 수 없어서 `components/` 로 옮겼다: `ArrivalSheet`(B6), `BusNow`, `OptionCard`(웹 `.option-card`), `TransitLive`(C2 버스 혼잡도·지하철 도착정보), `prepIcons`, `TextLink`(웹 `.text-link`), `Spinner`(`Spin`·`Skeleton`·`LoadingLine`)
 - `components/KakaoMap.jsx`: 웹에서 키가 없을 때 그리던 지도 그림(react-native-svg)만 있다. props는 웹과 같다 → 4단계에서 내부만 WebView로 바꾼다. 그림 지도는 움직이지 않으므로 `onCenterChange`는 `center`가 바뀔 때만 불린다
-- `lib/kakao.js`: 4단계 전까지 `searchPlaces`·`addressAt`이 null을 돌려준다 (웹에서 키가 없을 때와 같이 목적지 검색은 예시 결과, 주소는 저장된 값 유지)
+- `lib/kakao.js`: (4단계에서 실제 구현) 쓸 수 없으면 null → 목적지 검색은 예시 결과, 주소는 저장된 값 유지
 - `lib/transitInfo.js`: 웹 RouteSelectPage·RouteDetailPage에 따로 있던 버스 혼잡도·지하철 도착정보 조회를 하나로 모았다. 노선 선택에서는 둘을 동시에 조회한다 (웹은 차례로). 디버그용 `console.table`/`console.log`는 옮기지 않았다
 - `location.state` 대신 경로 파라미터: 홈 `?toast=`(기상 알람에서 미룬 뒤), 로그인 `?message=`(회원가입 완료)·`?error=`(5단계 간편 로그인 실패용)
 - 현재 위치: `navigator.geolocation` → `expo-location` (출발 위치 B5, 권한 안내 A5). `app.json` 에 iOS 위치 권한 문구를 넣었다
 - 알림 권한(A5·E3)은 6단계(`expo-notifications`)로 미뤘다. E3의 위치 행은 시스템 설정을 열고(`Linking.openSettings`), 위치 권한 상태를 보여준다. 맨 아래 안내 문구는 앱에 맞게 바꿨다
 - 기상 알람 → 출발 알람 → 경로 탭은 `router.replace`로 넘어간다 (끈 알람 화면으로 뒤로 가기 해 돌아오지 않게. 웹은 push)
 - 웹에서 BottomNav를 그리던 탭 밖 화면(D8 버스 지연 안내)은 스택 화면이라 탭 바가 없다
-- 간편 로그인 버튼은 "준비 중" 에러를 토스트로 보여준다 (5단계)
+- 간편 로그인 실패는 토스트로 보여준다 (5단계에서 구현)
 - 시작 화면에 개발 빌드(`__DEV__`)에서만 보이는 "화면 목록" 링크를 두었다 (앱에는 주소창이 없음). 화면 목록 맨 위에 `/gallery`를 둔다
 - `components/Placeholder.jsx` 는 지웠다
+
+## 4단계: 카카오 지도
+
+- `components/KakaoMap.jsx`: 키(`EXPO_PUBLIC_KAKAO_JS_KEY`)가 있으면 `react-native-webview` 안에서 카카오 JS SDK로 그린다. 키가 없거나 SDK를 못 불러오면 지도 그림으로 돌아간다
+- JS 키는 카카오 개발자 콘솔에 등록한 도메인에서만 동작한다 → WebView 페이지를 `source={{ html, baseUrl: WEB_URL }}`(기본 `https://buxby.vercel.app`)로 띄운다. 이 도메인이 콘솔 "Web 플랫폼"에 등록돼 있어야 한다
+- `lib/kakaoHtml.js`: WebView에 넣는 페이지. 페이지 안 스크립트는 **문자열로 적는다** (Hermes는 함수 소스를 남기지 않아 `fn.toString()`이 안 된다)
+- RN ↔ 페이지: 페이지는 `ReactNativeWebView.postMessage(JSON)`(`ready`·`error`·`center`·`result`), RN은 `injectJavaScript('window.__buxby.xxx(...)')`
+- 장소 검색·주소 변환(`lib/kakao.js`)은 루트 레이아웃의 보이지 않는 WebView(`components/KakaoBridge.jsx`)에 물어본다. 준비 전·시간 초과면 null → 화면이 예시 결과·이전 주소로 대신한다
+- 지도 위 가운데 핀(`centerPin`)은 터치를 막지 않는다(`pointerEvents: 'none'`)
+
+## 5단계: 간편 로그인
+
+백엔드는 세션 쿠키(JSESSIONID) 방식이고, 소셜 로그인은 시스템 브라우저에서 끝나서 세션도 브라우저에 생긴다. 그래서 일회용 코드로 넘긴다:
+
+1. 앱: `WebBrowser.openAuthSessionAsync(`${WEB_URL}/api/auth/app/social/{provider}?redirect_uri=buxby://auth`, 'buxby://auth')`
+   - 웹과 같은 주소(Vercel 프록시)에서 시작해야 소셜 콜백 주소(특히 Google)와 브라우저 세션 쿠키가 맞는다
+2. 백엔드(`AppLoginController`): 돌아갈 앱 주소를 브라우저 세션에 적고 `/oauth2/authorization/{provider}` 로 보낸다
+3. 로그인 성공 → `SecurityConfig` 성공 처리기가 `buxby://auth?socialLogin=success&code=...`(2분, 한 번만) 으로 보낸다. 실패는 `?socialLogin=failed`. 웹에서 시작한 로그인은 예전처럼 웹으로 간다
+4. 앱: `POST {API_URL}/api/auth/app/exchange {code}` → 앱 쪽 세션 쿠키가 기기 쿠키 저장소에 생기고, 이후 `getMe()` 등은 이메일 로그인과 같다
+- 로그인 화면이 결과를 받아 처리하고, 안드로이드에서 딥링크로 앱이 열리면 `app/auth.jsx`가 처리한다. 같은 코드는 한 번만 교환한다(`api/auth.js`)
+- 백엔드 허용 앱 주소: `app.mobile-redirect-prefixes`(환경 변수 `MOBILE_REDIRECT_PREFIXES`, 기본 `buxby://`). **Expo Go는 `exp://`로 돌아와서 기본값으로는 간편 로그인이 안 된다** → 개발 빌드(`npx expo run:android`)로 확인하거나, 로컬 백엔드에만 `buxby://,exp://`를 준다 (운영 서버에 `exp://`를 넣으면 다른 Expo 프로젝트로 코드가 샐 수 있다)
+- 일회용 코드는 서버 메모리에 둔다 (서버를 여러 대로 늘리면 공용 저장소로 옮겨야 함)
+- iOS는 만료 시각이 없는 세션 쿠키를 앱을 완전히 끄면 지울 수 있다 → 다시 로그인해야 할 수 있다 (오래 유지하려면 토큰 방식이 필요)
 
 ## 알려진 문제
 

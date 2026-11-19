@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { StyleSheet, View } from 'react-native'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useLocalSearchParams, useNavigation } from 'expo-router'
 import AppText from '../components/AppText'
 import { Content, Footer, Screen, TopBar } from '../components/layout'
 import { Button, InputField, SocialLoginButton } from '../components/controls'
@@ -16,11 +16,13 @@ import { colors } from '../theme/tokens'
 // 웹 location.state.message · error → ?message= · ?error= 파라미터
 export default function LoginScreen() {
   const params = useLocalSearchParams()
+  const navigation = useNavigation()
   const { state } = useAppState()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(typeof params.error === 'string' ? params.error : '')
   const [submitting, setSubmitting] = useState(false)
+  const [socialBusy, setSocialBusy] = useState(false)
   const [toast, showToast] = useToast(2800)
   const notice = typeof params.message === 'string' ? params.message : ''
 
@@ -49,8 +51,21 @@ export default function LoginScreen() {
     }
   }
 
-  // TODO(5단계): 시스템 브라우저 + buxby:// 딥링크. 지금은 api/auth.js가 "준비 중" 에러를 던진다
-  const social = (provider) => socialLogin(provider).catch((err) => showToast(err.message))
+  // 시스템 브라우저로 로그인하고 앱 주소(buxby://auth)로 돌아온다 (api/auth.js)
+  const social = async (provider) => {
+    if (socialBusy) return
+    setSocialBusy(true)
+    setError('')
+    try {
+      const me = await socialLogin(provider)
+      // 안드로이드에서 /auth 딥링크 화면이 먼저 떠서 처리 중이면 그쪽이 이동시킨다
+      if (me && navigation.isFocused()) router.replace(next)
+    } catch (err) {
+      showToast(err.message || '간편 로그인에 실패했어요.')
+    } finally {
+      setSocialBusy(false)
+    }
+  }
 
   return (
     <Screen bg="surface">

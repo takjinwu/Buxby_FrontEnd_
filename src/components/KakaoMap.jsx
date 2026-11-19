@@ -1,17 +1,22 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import Svg, { Path, Rect } from 'react-native-svg'
+import { WebView } from 'react-native-webview'
 import { BusFront, Flag, House } from 'lucide-react-native'
 import AppText from './AppText'
+import { hasKakaoKey } from '../lib/kakao'
+import { mapHtml } from '../lib/kakaoHtml'
+import { WEB_URL } from '../config'
 import { colors, radius, shadows } from '../theme/tokens'
 
 // 카카오 지도 (웹 components/KakaoMap.jsx)
-// TODO(4단계): WebView + 카카오 JS SDK로 실제 지도를 그린다. 지금은 웹에서 키가 없을 때 쓰던 지도 그림(피그마 MapBase)만 그린다.
+// 키가 있으면 WebView 안에서 카카오 지도 JS SDK로 그리고, 키가 없거나 SDK를 못 불러오면 지도 그림(피그마 MapBase)을 그린다.
 // props는 웹과 같다:
 // - markers: [{ type: 'home'|'bus'|'destination'|'current', lat, lng, x, y }]  (x, y는 지도 그림용 % 위치)
-// - route / walk: [[lat, lng], ...] 버스 구간 / 도보 구간 (그림에서는 있으면 예시 선을 그린다)
-// - callout: { title, sub, x, y }, labels: [{ text, x, y }]
-// - center, centerPin, onCenterChange(lat, lng): 위치 고르기. 그림 지도는 움직이지 않으므로 center를 그대로 알려준다
+// - route / walk: [[lat, lng], ...] 버스 구간 / 도보 구간
+// - callout: { title, sub, x, y, lat, lng }, labels: [{ text, x, y }] (labels는 그림 지도에서만)
+// - center: 바뀌면 지도를 그 위치로 옮긴다 (마커가 없으면 처음 중심으로도 씀)
+// - centerPin: 지도 가운데 고정 핀 (위치 고르기용), onCenterChange(lat, lng): 지도를 움직이고 멈출 때마다 가운데 좌표
 // - children: 지도 위에 띄울 버튼 (스스로 position: 'absolute'를 준다)
 
 const MARKER = {
@@ -38,9 +43,10 @@ export function Marker({ type }) {
 }
 
 // x%, y% 위치에 가운데를 맞춰 놓는다 (웹 translate(-50%, -50%)). 크기 0인 상자 안에서 가운데 정렬
-function At({ x, y, children }) {
+// inert: 지도를 끄는(드래그하는) 손가락을 막지 않는다 (가운데 고정 핀)
+function At({ x, y, inert, children }) {
   return (
-    <View style={[styles.at, { left: `${x}%`, top: `${y}%` }]}>
+    <View style={[styles.at, { left: `${x}%`, top: `${y}%` }, inert && styles.inert]}>
       {children}
     </View>
   )
@@ -120,6 +126,7 @@ export default function KakaoMap({
   height = 236,
   markers = [],
   route,
+  walk,
   callout,
   labels,
   center,
@@ -127,26 +134,73 @@ export default function KakaoMap({
   onCenterChange,
   children,
 }) {
+  const webRef = useRef(null)
   const onCenterChangeRef = useRef(onCenterChange)
+  const [mode, setMode] = useState(hasKakaoKey() ? 'loading' : 'fallback')
+  // 지도는 처음 한 번만 그린다 (웹과 같음). 이후 바뀌는 건 center뿐
+  const [html] = useState(() => (hasKakaoKey() ? mapHtml({ markers, route, walk, callout, center, centerPin }) : null))
+  const firstCenter = useRef(center)
+
   useEffect(() => {
     onCenterChangeRef.current = onCenterChange
   }, [onCenterChange])
 
-  // 웹은 지도가 멈출 때마다 가운데 좌표를 알려준다. 그림 지도는 움직이지 않으니 center가 바뀔 때만 알려준다
   useEffect(() => {
-    if (center) onCenterChangeRef.current?.(center.lat, center.lng)
-  }, [center])
+    // 그림 지도는 움직이지 않으니 center가 바뀔 때 그 좌표를 그대로 알려준다
+    if (mode === 'fallback') {
+      if (center) onCenterChangeRef.current?.(center.lat, center.lng)
+      return
+    }
+    // 현재 위치 버튼 등으로 center가 바뀌면 지도를 옮긴다 (처음 center는 페이지가 이미 알고 있다)
+    if (mode !== 'kakao' || !center || center === firstCenter.current) return
+    webRef.current?.injectJavaScript(`window.__buxby && window.__buxby.panTo(${Number(center.lat)}, ${Number(center.lng)}); true;`)
+  }, [center, mode])
+
+  const onMessage = (event) => {
+    let msg
+    try {
+      msg = JSON.parse(event.nativeEvent.data)
+    } catch {
+      return
+    }
+    if (msg.type === 'ready') setMode('kakao')
+    else if (msg.type === 'error') {
+      if (__DEV__) console.warn('[카카오 지도]', msg.message)
+      setMode('fallback')
+    } else if (msg.type === 'center') onCenterChangeRef.current?.(msg.lat, msg.lng)
+  }
 
   return (
     <View style={[styles.map, { height }]}>
-      <FallbackMap height={height} markers={markers} callout={callout} labels={labels} route={!!route} />
-      <View style={styles.badge}>
-        <AppText variant="caption" color="secondary">
-          지도 미리보기
-        </AppText>
-      </View>
+      {mode === 'fallback' ? (
+        <>
+          <FallbackMap height={height} markers={markers} callout={callout} labels={labels} route={!!route} />
+          <View style={styles.badge}>
+            <AppText variant="caption" color="secondary">
+              지도 미리보기
+            </AppText>
+          </View>
+        </>
+      ) : (
+        <WebView
+          ref={webRef}
+          // 카카오 JS 키는 콘솔에 등록한 도메인에서만 동작한다 → 웹 서비스 주소에서 연 페이지처럼 띄운다
+          source={{ html, baseUrl: WEB_URL }}
+          originWhitelist={['*']}
+          onMessage={onMessage}
+          onError={() => setMode('fallback')}
+          style={styles.web}
+          scrollEnabled={false}
+          bounces={false}
+          overScrollMode="never"
+          nestedScrollEnabled
+          setSupportMultipleWindows={false}
+          showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
       {centerPin && (
-        <At x={50} y={50}>
+        <At x={50} y={50} inert>
           <Marker type="home" />
         </At>
       )}
@@ -156,6 +210,8 @@ export default function KakaoMap({
 }
 
 const styles = StyleSheet.create({
+  web: { flex: 1, backgroundColor: colors.bgSubtle },
+  inert: { pointerEvents: 'none' },
   map: { position: 'relative', flexShrink: 0, width: '100%', overflow: 'hidden', backgroundColor: colors.bgSubtle },
   at: { position: 'absolute', width: 0, height: 0, pointerEvents: 'box-none', alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
   badge: {

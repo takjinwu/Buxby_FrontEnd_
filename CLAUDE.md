@@ -15,7 +15,7 @@
 | 단계 | 내용 | 상태 |
 |---|---|---|
 | 1 | Expo 뼈대, 라우팅, `lib/`·`api/`·`store/`·`data/` 이식, 디자인 토큰 | 완료 |
-| 2 | 공통 컴포넌트 (`controls`, `display`, `layout`, `MinutesSheet`, `BrandLogos`) | |
+| 2 | 공통 컴포넌트 (`controls`, `display`, `layout`, `MinutesSheet`, `BrandLogos`) | 완료 (`/gallery`에서 확인) |
 | 3 | 화면 이식 (`src/app/**` 의 Placeholder를 실제 화면으로) | |
 | 4 | 카카오 지도 (`KakaoMap.jsx`, `lib/kakao.js`) — WebView + JS SDK 우선 | |
 | 5 | 간편 로그인 (시스템 브라우저 + `buxby://` 딥링크, 토큰 저장) — 백엔드 수정 필요 | |
@@ -73,12 +73,43 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
   - `window.open(url)` → `Linking.openURL(url)`
   - `import.meta.env.VITE_*` → `config.js` (`process.env.EXPO_PUBLIC_*`)
 
+## 공통 컴포넌트 사용법 (2단계, `src/components/`)
+
+이름과 props는 웹과 같게 맞췄다. 웹 화면 코드를 옮길 때 달라지는 점만 적는다.
+
+- **글자는 전부 `AppText`** (`components/AppText.jsx`)
+  - `<p className="t-body-s c-secondary">` → `<AppText variant="bodyS" color="secondary">`
+  - `<strong className="t-title-s">` 처럼 일부만 굵게: AppText 안에 AppText를 넣는다 (인라인으로 이어짐)
+  - color를 안 주면 화면 기본색: 보통 `textPrimary`, `Screen bg="alarm"|"brand"` 안에서는 흰색 (CSS 상속 대신 `ForegroundContext`)
+- **화면 틀** (`layout.jsx`)
+  - `<Screen bg tab>`: 웹에서 `<BottomNav />`를 그리던 화면은 BottomNav를 지우고 `tab`을 준다 (아래 안전 영역을 탭 바가 처리)
+  - `<Content gap style scroll>`: ScrollView. `style`은 안쪽 내용 상자에 적용. `scroll={false}`면 고정 레이아웃
+  - `<Footer>`, `<Spacer />`, `<TopBar>`는 웹과 같음. TopBar `action`은 `{ label, onPress }`
+  - `<BottomSheet open title onClose>`: RN Modal. 안드로이드 뒤로 가기로도 닫힌다
+  - `IconButton`: 웹 `.icon-button`
+  - `useGutter()`: 좌우 여백 (보통 24, 360px 미만 16)
+- **이벤트 이름**: 모든 컴포넌트가 `onClick` 대신 `onPress` (Button, Chip, DayChip, ListRow, SettingRow, BusRow, NotificationCard, SocialLoginButton). Toggle·Checkbox는 웹처럼 `onChange(값)`
+- **`className` → `style`**: 각 컴포넌트가 `style`을 받는다. `Card`는 `style`(안쪽: padding·gap·배경)과 `containerStyle`(바깥: margin·flex)을 따로 받는다 (iOS에서 그림자가 잘리지 않게)
+- **Button**: `type="submit"`·`<form onSubmit>` 없음 → 버튼 `onPress`에서 제출 함수를 부른다. children이 문자열이면 글자 스타일이 입혀지고, 아이콘을 섞을 수 있다
+- **InputField**: `onChange={(e) => set(e.target.value)}` → `onChangeText={set}`. `type`(email·password·tel·number·search)이 키보드 종류를 정한다. 나머지 props는 TextInput으로 넘어간다
+- **칩 줄**: 웹 `<div className="chip-row chip-row--fill">` → `<ChipRow fill>`
+- **분 입력**: `MinutesField`, `NumberBox`(숫자+'분' 상자), `MinutesSheet`
+- **Toast**: Screen 바로 안쪽 맨 끝에 둔다 (화면 기준 absolute)
+- `RouteStep`은 웹의 `<li>`였다 → 부모를 `<ol>` 대신 `<View>`로
+- 페이지 전용 스타일(웹 `pages.css`)은 각 화면 파일 아래 `StyleSheet.create`로 옮긴다
+
 ## 1단계에서 원본과 달라진 점
 
 - `api/client.js`: 상대경로 `/api/...` 앞에 `API_URL` 을 붙인다. `URLSearchParams` 대신 직접 쿼리 문자열을 만들고, 값이 `undefined`/`null` 인 항목은 보내지 않는다 (원본은 `"undefined"` 문자열로 보냈음)
 - `api/auth.js`: `socialLogin()` 은 5단계 전까지 "준비 중" 에러를 던진다
 - `store/AppStateProvider.jsx`: 저장소를 다 읽기 전(`hydrated=false`)에는 아무것도 그리지 않고 스플래시를 유지한다. 읽기 전에는 저장하지 않는다
 - 아직 옮기지 않음: `lib/kakao.js`(4단계), `components/AlarmWatcher.jsx`(6단계), 간편 로그인 리다이렉트 처리(5단계)
+
+## 2단계에서 원본과 달라진 점
+
+- 폰트: 웹은 Noto Sans KR(Google Fonts)을 불러오지만 앱은 시스템 폰트를 쓴다. 안드로이드 한글 시스템 폰트는 Noto Sans CJK라 거의 같고, iOS는 Apple SD Gothic Neo(웹 폰트 목록의 두 번째 후보)다. 4개 굵기 폰트 파일을 넣으면 앱 용량이 크게 늘어서 보류
+- 누르는 행(ListRow·SettingRow·BusRow·NotificationCard)과 버튼·칩은 누르는 동안 배경이 살짝 바뀐다 (웹에는 없던 터치 피드백)
+- 숫자 입력칸 너비는 웹의 `ch` 단위 대신 `자릿수 × 글자 폭` 근사값
 
 ## 알려진 문제
 

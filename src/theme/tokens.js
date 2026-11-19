@@ -77,7 +77,25 @@ export const colors = {
   chartBarMuted: p.blue300,
 }
 
-export const spacing = { 2: 2, 4: 4, 8: 8, 12: 12, 16: 16, 20: 20, 24: 24, 32: 32, 40: 40 }
+// 텍스트 색 이름 (웹 .c-primary · .c-secondary ... 클래스) → AppText의 color prop
+export const textTones = {
+  primary: colors.textPrimary,
+  secondary: colors.textSecondary,
+  tertiary: colors.textTertiary,
+  brand: colors.textBrand,
+  danger: colors.textDanger,
+  success: colors.textSuccess,
+  onBrand: colors.textOnBrand,
+  disabled: colors.textDisabled,
+}
+
+// 바텀시트 뒤 어두운 막, 토스트 배경
+export const overlay = {
+  dim: 'rgba(17, 24, 39, 0.45)',
+  toast: p.gray900,
+}
+
+export const spacing ={ 2: 2, 4: 4, 8: 8, 12: 12, 16: 16, 20: 20, 24: 24, 32: 32, 40: 40 }
 
 export const radius = { sm: 8, md: 12, lg: 16, xl: 24, full: 999 }
 

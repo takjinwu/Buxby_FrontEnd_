@@ -2,6 +2,7 @@ import Placeholder from '../components/Placeholder'
 
 // 웹 pages/ScreensPage.jsx — 모든 화면으로 바로 가는 검수용 목록
 const SCREENS = [
+  { label: '공통 컴포넌트 검수', href: '/gallery' },
   { label: '시작', href: '/' },
   { label: '로그인', href: '/login' },
   { label: '회원가입', href: '/signup' },

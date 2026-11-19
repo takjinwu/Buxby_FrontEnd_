@@ -16,7 +16,7 @@
 |---|---|---|
 | 1 | Expo 뼈대, 라우팅, `lib/`·`api/`·`store/`·`data/` 이식, 디자인 토큰 | 완료 |
 | 2 | 공통 컴포넌트 (`controls`, `display`, `layout`, `MinutesSheet`, `BrandLogos`) | 완료 (`/gallery`에서 확인) |
-| 3 | 화면 이식 (`src/app/**` 의 Placeholder를 실제 화면으로) | |
+| 3 | 화면 이식 (`src/app/**` 의 Placeholder를 실제 화면으로) | 완료 (기기 실행 확인 전) |
 | 4 | 카카오 지도 (`KakaoMap.jsx`, `lib/kakao.js`) — WebView + JS SDK 우선 | |
 | 5 | 간편 로그인 (시스템 브라우저 + `buxby://` 딥링크, 토큰 저장) — 백엔드 수정 필요 | |
 | 6 | 알람 (`AlarmWatcher.jsx` → 로컬 알림 예약, 출발 알림은 서버 푸시) | |
@@ -103,13 +103,28 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
 - `api/client.js`: 상대경로 `/api/...` 앞에 `API_URL` 을 붙인다. `URLSearchParams` 대신 직접 쿼리 문자열을 만들고, 값이 `undefined`/`null` 인 항목은 보내지 않는다 (원본은 `"undefined"` 문자열로 보냈음)
 - `api/auth.js`: `socialLogin()` 은 5단계 전까지 "준비 중" 에러를 던진다
 - `store/AppStateProvider.jsx`: 저장소를 다 읽기 전(`hydrated=false`)에는 아무것도 그리지 않고 스플래시를 유지한다. 읽기 전에는 저장하지 않는다
-- 아직 옮기지 않음: `lib/kakao.js`(4단계), `components/AlarmWatcher.jsx`(6단계), 간편 로그인 리다이렉트 처리(5단계)
+- 아직 옮기지 않음: `lib/kakao.js` 실제 구현(4단계, 지금은 빈 껍데기), `components/AlarmWatcher.jsx`(6단계), 간편 로그인 리다이렉트 처리(5단계)
 
 ## 2단계에서 원본과 달라진 점
 
 - 폰트: 웹은 Noto Sans KR(Google Fonts)을 불러오지만 앱은 시스템 폰트를 쓴다. 안드로이드 한글 시스템 폰트는 Noto Sans CJK라 거의 같고, iOS는 Apple SD Gothic Neo(웹 폰트 목록의 두 번째 후보)다. 4개 굵기 폰트 파일을 넣으면 앱 용량이 크게 늘어서 보류
 - 누르는 행(ListRow·SettingRow·BusRow·NotificationCard)과 버튼·칩은 누르는 동안 배경이 살짝 바뀐다 (웹에는 없던 터치 피드백)
 - 숫자 입력칸 너비는 웹의 `ch` 단위 대신 `자릿수 × 글자 폭` 근사값
+
+## 3단계에서 원본과 달라진 점
+
+- 화면 전용 부품은 `src/app` 에 둘 수 없어서 `components/` 로 옮겼다: `ArrivalSheet`(B6), `BusNow`, `OptionCard`(웹 `.option-card`), `TransitLive`(C2 버스 혼잡도·지하철 도착정보), `prepIcons`, `TextLink`(웹 `.text-link`), `Spinner`(`Spin`·`Skeleton`·`LoadingLine`)
+- `components/KakaoMap.jsx`: 웹에서 키가 없을 때 그리던 지도 그림(react-native-svg)만 있다. props는 웹과 같다 → 4단계에서 내부만 WebView로 바꾼다. 그림 지도는 움직이지 않으므로 `onCenterChange`는 `center`가 바뀔 때만 불린다
+- `lib/kakao.js`: 4단계 전까지 `searchPlaces`·`addressAt`이 null을 돌려준다 (웹에서 키가 없을 때와 같이 목적지 검색은 예시 결과, 주소는 저장된 값 유지)
+- `lib/transitInfo.js`: 웹 RouteSelectPage·RouteDetailPage에 따로 있던 버스 혼잡도·지하철 도착정보 조회를 하나로 모았다. 노선 선택에서는 둘을 동시에 조회한다 (웹은 차례로). 디버그용 `console.table`/`console.log`는 옮기지 않았다
+- `location.state` 대신 경로 파라미터: 홈 `?toast=`(기상 알람에서 미룬 뒤), 로그인 `?message=`(회원가입 완료)·`?error=`(5단계 간편 로그인 실패용)
+- 현재 위치: `navigator.geolocation` → `expo-location` (출발 위치 B5, 권한 안내 A5). `app.json` 에 iOS 위치 권한 문구를 넣었다
+- 알림 권한(A5·E3)은 6단계(`expo-notifications`)로 미뤘다. E3의 위치 행은 시스템 설정을 열고(`Linking.openSettings`), 위치 권한 상태를 보여준다. 맨 아래 안내 문구는 앱에 맞게 바꿨다
+- 기상 알람 → 출발 알람 → 경로 탭은 `router.replace`로 넘어간다 (끈 알람 화면으로 뒤로 가기 해 돌아오지 않게. 웹은 push)
+- 웹에서 BottomNav를 그리던 탭 밖 화면(D8 버스 지연 안내)은 스택 화면이라 탭 바가 없다
+- 간편 로그인 버튼은 "준비 중" 에러를 토스트로 보여준다 (5단계)
+- 시작 화면에 개발 빌드(`__DEV__`)에서만 보이는 "화면 목록" 링크를 두었다 (앱에는 주소창이 없음). 화면 목록 맨 위에 `/gallery`를 둔다
+- `components/Placeholder.jsx` 는 지웠다
 
 ## 알려진 문제
 

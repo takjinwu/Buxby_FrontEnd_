@@ -150,6 +150,21 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
 - 일회용 코드는 서버 메모리에 둔다 (서버를 여러 대로 늘리면 공용 저장소로 옮겨야 함)
 - iOS는 만료 시각이 없는 세션 쿠키를 앱을 완전히 끄면 지울 수 있다 → 다시 로그인해야 할 수 있다 (오래 유지하려면 토큰 방식이 필요)
 
+## 릴리스 APK (로컬 빌드)
+
+```
+npx expo prebuild --platform android --clean        # android/ 생성 (package.json scripts가 바뀌면 되돌린다)
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+# → android/app/build/outputs/apk/release/app-release.apk
+```
+
+- 안드로이드 패키지 이름: `com.buxby.app` (`app.json`)
+- Windows 경로 260자 제한: react-native-gesture-handler 3.x(expo-router가 씀)가 `../shared` 의 C++을 컴파일해서 오브젝트 경로가 330자를 넘는다. SDK 기본 CMake 3.22.1의 ninja 1.10은 이걸 못 다룬다
+  - 준비 (PC마다 한 번): 레지스트리 `LongPathsEnabled=1` (관리자 권한) + Android SDK에 `cmake;3.31.6` 설치 (ninja 1.12 포함)
+  - `plugins/withWindowsCMake.js` 가 prebuild 때 `android/local.properties` 에 `cmake.dir` 을 적어 모든 모듈이 3.31.6을 쓰게 한다
+- 서명: 지금은 prebuild 기본값인 **디버그 키**로 서명된다. 직접 설치해서 테스트하는 데는 문제없지만 Play 스토어에 올리려면 업로드 키와 서명 설정이 필요하다
+- `EXPO_PUBLIC_*` 는 빌드할 때 코드에 들어간다 → `.env.local` 을 채운 다음 빌드한다 (카카오 키가 없으면 지도 자리에 그림 지도가 나온다)
+
 ## 알려진 문제
 
 - `package.json` 의 `overrides: { "react-dom": "$react" }` 는 지우지 않는다. expo-router가 웹용으로 끌어오는 `react-dom@19.3.1` 이 RN의 `react@19.3.0` 과 peer 충돌을 일으켜 `npm install` 이 실패한다

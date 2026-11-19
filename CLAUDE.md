@@ -141,7 +141,8 @@ URL은 웹과 똑같이 유지해서 `navigate('/x')` 를 `router.push('/x')` �
 
 1. 앱: `WebBrowser.openAuthSessionAsync(`${WEB_URL}/api/auth/app/social/{provider}?redirect_uri=buxby://auth`, 'buxby://auth')`
    - 웹과 같은 주소(Vercel 프록시)에서 시작해야 소셜 콜백 주소(특히 Google)와 브라우저 세션 쿠키가 맞는다
-2. 백엔드(`AppLoginController`): 돌아갈 앱 주소를 브라우저 세션에 적고 `/oauth2/authorization/{provider}` 로 보낸다
+2. 백엔드(`AppLoginController`): 돌아갈 앱 주소를 "시작 대기"로 브라우저 세션에 적고 `/oauth2/authorization/{provider}` 로 보낸다
+   - `AppLoginStartFilter`가 바로 이어지는 그 요청(같은 provider, 1분 이내)에서만 앱 주소로 확정한다. 웹에서 시작한 로그인은 남은 앱 주소를 지운다 (앱 로그인을 중간에 그만둔 브라우저에서 웹으로 로그인해도 웹으로 돌아감)
 3. 로그인 성공 → `SecurityConfig` 성공 처리기가 `buxby://auth?socialLogin=success&code=...`(2분, 한 번만) 으로 보낸다. 실패는 `?socialLogin=failed`. 웹에서 시작한 로그인은 예전처럼 웹으로 간다
 4. 앱: `POST {API_URL}/api/auth/app/exchange {code}` → 앱 쪽 세션 쿠키가 기기 쿠키 저장소에 생기고, 이후 `getMe()` 등은 이메일 로그인과 같다
 - 로그인 화면이 결과를 받아 처리하고, 안드로이드에서 딥링크로 앱이 열리면 `app/auth.jsx`가 처리한다. 같은 코드는 한 번만 교환한다(`api/auth.js`)
